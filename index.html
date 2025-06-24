@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>@cat_tweet</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <style>
     body {
       margin: 0;
@@ -12,7 +15,6 @@
       color: #eee;
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     }
-
     header {
       background: #1d9bf0;
       color: white;
@@ -23,14 +25,16 @@
       top: 0;
       z-index: 10;
     }
-
+    #auth {
+      margin-bottom: 1em;
+    }
     #postForm {
       background: #111;
       padding: 1em;
       border-radius: 10px;
       margin-bottom: 1em;
+      display: none;
     }
-
     #text {
       width: 100%;
       background: #222;
@@ -40,12 +44,10 @@
       padding: 0.5em;
       font-size: 16px;
     }
-
     input[type="file"] {
       margin-top: 0.5em;
       color: #ccc;
     }
-
     button {
       margin-top: 0.5em;
       background: #1d9bf0;
@@ -56,82 +58,72 @@
       font-weight: bold;
       cursor: pointer;
     }
-
     #posts {
       display: flex;
-      flex-direction: column;
+      flex-direction: column-reverse;
     }
-
     .post {
       display: flex;
       gap: 0.8em;
       padding: 1em 0;
       border-bottom: 1px solid #222;
     }
-
     .icon {
       width: 48px;
       height: 48px;
       border-radius: 50%;
       flex-shrink: 0;
     }
-
     .content {
       flex-grow: 1;
     }
-
     .name {
       font-weight: bold;
       color: #fff;
     }
-
     .handle {
       color: #888;
       margin-left: 0.3em;
     }
-
     .text {
       margin: 0.5em 0;
       white-space: pre-wrap;
       word-break: break-word;
     }
-
     .images {
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
     }
-
     .images img {
       max-width: 100px;
       border-radius: 10px;
     }
-
     .timestamp {
       color: #555;
       font-size: 0.75em;
       margin-top: 0.5em;
     }
-
-    .buttons {
-      display: flex;
-      gap: 8px;
-      margin-top: 0.5em;
-    }
-
-    .iconBtn, .deleteBtn {
-      background: transparent;
-      border: 1px solid #888;
-      color: #888;
-      padding: 0.2em 0.6em;
+    .btn {
+      background: none;
+      border: 1px solid gray;
+      color: gray;
       border-radius: 5px;
-      cursor: pointer;
+      padding: 0.2em 0.6em;
       font-size: 0.75em;
+      margin-top: 0.5em;
+      margin-right: 0.5em;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
   <header>@cat_tweet</header>
+
+  <div id="auth">
+    <button id="loginBtn">Googleでログイン</button>
+    <button id="logoutBtn" style="display:none;">ログアウト</button>
+  </div>
 
   <div id="postForm">
     <textarea id="text" rows="3" placeholder="いまどうしてる？"></textarea><br>
@@ -142,87 +134,119 @@
   <div id="posts"></div>
 
   <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAspkTJUGlHAZyvaYjiM_W-cqRm9P7E_3g",
+      authDomain: "cat-tw.firebaseapp.com",
+      databaseURL: "https://cat-tw-default-rtdb.firebaseio.com",
+      projectId: "cat-tw",
+      storageBucket: "cat-tw.appspot.com",
+      messagingSenderId: "458282109364",
+      appId: "1:458282109364:web:bd10e3f3dbd0d95332cae1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
+
     const iconPath = "icon.PNG";
     const displayName = "cat_diary";
     const userHandle = "@odayaka_night";
+    let currentUID = null;
+
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const postForm = document.getElementById("postForm");
+
+    loginBtn.onclick = () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider);
+    };
+
+    logoutBtn.onclick = () => {
+      auth.signOut();
+    };
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        currentUID = user.uid;
+        console.log("ログイン中 UID:", currentUID);
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline-block";
+        postForm.style.display = "block";
+      } else {
+        currentUID = null;
+        loginBtn.style.display = "inline-block";
+        logoutBtn.style.display = "none";
+        postForm.style.display = "none";
+      }
+      loadPosts();
+    });
 
     function loadPosts() {
-      let posts = JSON.parse(localStorage.getItem("posts") || "[]");
-      posts.sort((a, b) => b.time - a.time); // 上が新しい順に並べる
-      const container = document.getElementById("posts");
-      container.innerHTML = "";
+      db.ref("posts").once("value").then(snapshot => {
+        const container = document.getElementById("posts");
+        container.innerHTML = "";
+        const posts = [];
+        snapshot.forEach(child => {
+          posts.push({ key: child.key, ...child.val() });
+        });
+        posts.sort((a, b) => b.time - a.time);
+        posts.forEach(post => {
+          const div = document.createElement("div");
+          div.className = "post";
 
-      posts.forEach((post, index) => {
-        const div = document.createElement("div");
-        div.className = "post";
+          const icon = document.createElement("img");
+          icon.src = iconPath;
+          icon.className = "icon";
 
-        const icon = document.createElement("img");
-        icon.src = iconPath;
-        icon.className = "icon";
+          const content = document.createElement("div");
+          content.className = "content";
 
-        const content = document.createElement("div");
-        content.className = "content";
+          const nameLine = document.createElement("div");
+          nameLine.innerHTML = `<span class="name">${displayName}</span><span class="handle">${userHandle}</span>`;
+          content.appendChild(nameLine);
 
-        const nameLine = document.createElement("div");
-        nameLine.innerHTML = `<span class="name">${displayName}</span><span class="handle">${userHandle}</span>`;
-        content.appendChild(nameLine);
+          const text = document.createElement("div");
+          text.className = "text";
+          text.textContent = post.text;
+          content.appendChild(text);
 
-        const text = document.createElement("div");
-        text.className = "text";
-        text.textContent = post.text;
-        content.appendChild(text);
+          if (post.images && post.images.length > 0) {
+            const imgDiv = document.createElement("div");
+            imgDiv.className = "images";
+            post.images.forEach(src => {
+              const img = document.createElement("img");
+              img.src = src;
+              imgDiv.appendChild(img);
+            });
+            content.appendChild(imgDiv);
+          }
 
-        if (post.images && post.images.length > 0) {
-          const imgDiv = document.createElement("div");
-          imgDiv.className = "images";
-          post.images.forEach(src => {
-            const img = document.createElement("img");
-            img.src = src;
-            imgDiv.appendChild(img);
-          });
-          content.appendChild(imgDiv);
-        }
+          const time = document.createElement("div");
+          time.className = "timestamp";
+          time.textContent = new Date(post.time).toLocaleString();
+          content.appendChild(time);
 
-        const time = document.createElement("div");
-        time.className = "timestamp";
-        time.textContent = new Date(post.time).toLocaleString();
-        content.appendChild(time);
+          if (auth.currentUser && auth.currentUser.uid === post.uid) {
+            const delBtn = document.createElement("button");
+            delBtn.className = "btn";
+            delBtn.textContent = "削除";
+            delBtn.onclick = () => {
+              db.ref("posts/" + post.key).remove().then(loadPosts);
+            };
+            content.appendChild(delBtn);
+          }
 
-        const buttons = document.createElement("div");
-        buttons.className = "buttons";
-
-        const likeBtn = document.createElement("button");
-        likeBtn.className = "iconBtn";
-        likeBtn.textContent = "♡";
-        buttons.appendChild(likeBtn);
-
-        const starBtn = document.createElement("button");
-        starBtn.className = "iconBtn";
-        starBtn.textContent = "⭐︎";
-        buttons.appendChild(starBtn);
-
-        const delBtn = document.createElement("button");
-        delBtn.className = "deleteBtn";
-        delBtn.textContent = "削除";
-        delBtn.onclick = () => {
-          const posts = JSON.parse(localStorage.getItem("posts") || "[]");
-          const newPosts = posts.filter((_, i) => i !== index);
-          localStorage.setItem("posts", JSON.stringify(newPosts));
-          loadPosts();
-        };
-        buttons.appendChild(delBtn);
-
-        content.appendChild(buttons);
-        div.appendChild(icon);
-        div.appendChild(content);
-        container.appendChild(div);
+          div.appendChild(icon);
+          div.appendChild(content);
+          container.appendChild(div);
+        });
       });
     }
 
     function addPost() {
       const text = document.getElementById("text").value;
       const input = document.getElementById("imageInput");
-      if (!text.trim()) return;
+      if (!text.trim() || !currentUID) return;
 
       const files = Array.from(input.files).slice(0, 4);
       const readers = files.map(file => {
@@ -234,16 +258,19 @@
       });
 
       Promise.all(readers).then(images => {
-        const posts = JSON.parse(localStorage.getItem("posts") || "[]");
-        posts.push({ text, images, time: Date.now() });
-        localStorage.setItem("posts", JSON.stringify(posts));
-        document.getElementById("text").value = "";
-        document.getElementById("imageInput").value = "";
-        loadPosts();
+        const newPost = {
+          text,
+          images,
+          time: Date.now(),
+          uid: currentUID
+        };
+        db.ref("posts").push(newPost).then(() => {
+          document.getElementById("text").value = "";
+          document.getElementById("imageInput").value = "";
+          loadPosts();
+        });
       });
     }
-
-    loadPosts();
   </script>
 </body>
 </html>
