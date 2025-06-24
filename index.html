@@ -13,6 +13,17 @@
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
+    header {
+      background: #1d9bf0;
+      color: white;
+      font-weight: bold;
+      font-size: 18px;
+      padding: 0.8em 1em;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
     #postForm {
       background: #111;
       padding: 1em;
@@ -104,19 +115,23 @@
 
     .deleteBtn {
       background: transparent;
-      border: 1px solid #f33;
-      color: #f33;
-      padding: 0.2em 0.5em;
-      border-radius: 5px;
+      border: none;
+      color: #999;
+      font-size: 1em;
       cursor: pointer;
-      font-size: 0.7em;
       margin-top: 0.5em;
+    }
+
+    .deleteBtn:hover {
+      color: #ccc;
     }
   </style>
 </head>
 <body>
+  <header>@cat_tweet</header>
+
   <div id="postForm">
-    <textarea id="text" rows="3" placeholder="いまどうしてる？（絵文字OK）"></textarea><br>
+    <textarea id="text" rows="3" placeholder="いまどうしてる？"></textarea><br>
     <input type="file" id="imageInput" accept="image/*" multiple /><br>
     <button onclick="addPost()">投稿</button>
   </div>
@@ -171,7 +186,7 @@
 
         const del = document.createElement("button");
         del.className = "deleteBtn";
-        del.textContent = "削除";
+        del.textContent = "🗑";
         del.onclick = () => {
           const posts = JSON.parse(localStorage.getItem("posts") || "[]");
           posts.splice(index, 1);
@@ -186,21 +201,35 @@
       });
     }
 
+    function resizeImage(file, maxSize = 480) {
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = event => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/jpeg", 0.7)); // 圧縮JPEG
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     function addPost() {
       const text = document.getElementById("text").value;
       const input = document.getElementById("imageInput");
       if (!text.trim()) return;
 
       const files = Array.from(input.files).slice(0, 4);
-      const readers = files.map(file => {
-        return new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onload = e => resolve(e.target.result);
-          reader.readAsDataURL(file);
-        });
-      });
+      const resizedPromises = files.map(file => resizeImage(file));
 
-      Promise.all(readers).then(images => {
+      Promise.all(resizedPromises).then(images => {
         const posts = JSON.parse(localStorage.getItem("posts") || "[]");
         posts.push({ text, images, time: Date.now() });
         localStorage.setItem("posts", JSON.stringify(posts));
