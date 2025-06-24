@@ -113,17 +113,26 @@
       margin-top: 0.5em;
     }
 
-    .deleteBtn {
-      background: transparent;
-      border: none;
-      color: #999;
-      font-size: 1em;
-      cursor: pointer;
+    .buttonRow {
       margin-top: 0.5em;
+      display: flex;
+      gap: 8px;
     }
 
-    .deleteBtn:hover {
+    .likeBtn, .starBtn, .deleteBtn {
+      background: transparent;
+      border: 1px solid #555;
       color: #ccc;
+      padding: 0.2em 0.6em;
+      border-radius: 5px;
+      font-size: 0.8em;
+      cursor: pointer;
+    }
+
+    .likeBtn:hover, .starBtn:hover, .deleteBtn:hover {
+      background: #222;
+      color: #fff;
+      border-color: #888;
     }
   </style>
 </head>
@@ -184,16 +193,33 @@
         time.textContent = new Date(post.time).toLocaleString();
         content.appendChild(time);
 
+        const buttonRow = document.createElement("div");
+        buttonRow.className = "buttonRow";
+
+        const likeBtn = document.createElement("button");
+        likeBtn.className = "likeBtn";
+        likeBtn.textContent = "♡";
+        likeBtn.onclick = () => alert("いいねしました（気持ちだけ）");
+
+        const starBtn = document.createElement("button");
+        starBtn.className = "starBtn";
+        starBtn.textContent = "⭐︎";
+        starBtn.onclick = () => alert("スターしました（意味はない）");
+
         const del = document.createElement("button");
         del.className = "deleteBtn";
-        del.textContent = "🗑";
+        del.textContent = "削除";
         del.onclick = () => {
           const posts = JSON.parse(localStorage.getItem("posts") || "[]");
           posts.splice(index, 1);
           localStorage.setItem("posts", JSON.stringify(posts));
           loadPosts();
         };
-        content.appendChild(del);
+
+        buttonRow.appendChild(likeBtn);
+        buttonRow.appendChild(starBtn);
+        buttonRow.appendChild(del);
+        content.appendChild(buttonRow);
 
         div.appendChild(icon);
         div.appendChild(content);
@@ -213,7 +239,7 @@
             canvas.height = img.height * scale;
             const ctx = canvas.getContext("2d");
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL("image/jpeg", 0.7)); // 圧縮JPEG
+            resolve(canvas.toDataURL("image/jpeg", 0.7));
           };
           img.src = event.target.result;
         };
