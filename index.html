@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>@cat_tweet</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <style>
     body {
       margin: 0;
@@ -14,6 +12,7 @@
       color: #eee;
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     }
+
     header {
       background: #1d9bf0;
       color: white;
@@ -24,12 +23,14 @@
       top: 0;
       z-index: 10;
     }
+
     #postForm {
       background: #111;
       padding: 1em;
       border-radius: 10px;
       margin-bottom: 1em;
     }
+
     #text {
       width: 100%;
       background: #222;
@@ -39,10 +40,12 @@
       padding: 0.5em;
       font-size: 16px;
     }
+
     input[type="file"] {
       margin-top: 0.5em;
       color: #ccc;
     }
+
     button {
       margin-top: 0.5em;
       background: #1d9bf0;
@@ -53,64 +56,77 @@
       font-weight: bold;
       cursor: pointer;
     }
+
     #posts {
       display: flex;
-      flex-direction: column-reverse;
+      flex-direction: column;
     }
+
     .post {
       display: flex;
       gap: 0.8em;
       padding: 1em 0;
       border-bottom: 1px solid #222;
     }
+
     .icon {
       width: 48px;
       height: 48px;
       border-radius: 50%;
       flex-shrink: 0;
     }
+
     .content {
       flex-grow: 1;
     }
+
     .name {
       font-weight: bold;
       color: #fff;
     }
+
     .handle {
       color: #888;
       margin-left: 0.3em;
     }
+
     .text {
       margin: 0.5em 0;
       white-space: pre-wrap;
       word-break: break-word;
     }
+
     .images {
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
     }
+
     .images img {
       max-width: 100px;
       border-radius: 10px;
     }
+
     .timestamp {
       color: #555;
       font-size: 0.75em;
       margin-top: 0.5em;
     }
-    .actions {
+
+    .buttons {
+      display: flex;
+      gap: 8px;
       margin-top: 0.5em;
     }
-    .btn {
-      background: none;
-      border: 1px solid gray;
-      color: gray;
-      border-radius: 5px;
+
+    .iconBtn, .deleteBtn {
+      background: transparent;
+      border: 1px solid #888;
+      color: #888;
       padding: 0.2em 0.6em;
-      font-size: 0.75em;
-      margin-right: 0.5em;
+      border-radius: 5px;
       cursor: pointer;
+      font-size: 0.75em;
     }
   </style>
 </head>
@@ -126,83 +142,80 @@
   <div id="posts"></div>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyAspkTJUGlHAZyvaYjiM_W-cqRm9P7E_3g",
-      authDomain: "cat-tw.firebaseapp.com",
-      databaseURL: "https://cat-tw-default-rtdb.firebaseio.com",
-      projectId: "cat-tw",
-      storageBucket: "cat-tw.appspot.com",
-      messagingSenderId: "458282109364",
-      appId: "1:458282109364:web:bd10e3f3dbd0d95332cae1",
-      measurementId: "G-V8WDY8FB5B"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
     const iconPath = "icon.PNG";
     const displayName = "cat_diary";
     const userHandle = "@odayaka_night";
 
     function loadPosts() {
-      db.ref("posts").once("value").then(snapshot => {
-        const posts = [];
-        snapshot.forEach(child => {
-          posts.push({ key: child.key, ...child.val() });
-        });
-        posts.sort((a, b) => b.time - a.time);
+      let posts = JSON.parse(localStorage.getItem("posts") || "[]");
+      posts.sort((a, b) => b.time - a.time); // 上が新しい順に並べる
+      const container = document.getElementById("posts");
+      container.innerHTML = "";
 
-        const container = document.getElementById("posts");
-        container.innerHTML = "";
+      posts.forEach((post, index) => {
+        const div = document.createElement("div");
+        div.className = "post";
 
-        posts.forEach(post => {
-          const div = document.createElement("div");
-          div.className = "post";
+        const icon = document.createElement("img");
+        icon.src = iconPath;
+        icon.className = "icon";
 
-          const icon = document.createElement("img");
-          icon.src = iconPath;
-          icon.className = "icon";
+        const content = document.createElement("div");
+        content.className = "content";
 
-          const content = document.createElement("div");
-          content.className = "content";
+        const nameLine = document.createElement("div");
+        nameLine.innerHTML = `<span class="name">${displayName}</span><span class="handle">${userHandle}</span>`;
+        content.appendChild(nameLine);
 
-          const nameLine = document.createElement("div");
-          nameLine.innerHTML = `<span class="name">${displayName}</span><span class="handle">${userHandle}</span>`;
-          content.appendChild(nameLine);
+        const text = document.createElement("div");
+        text.className = "text";
+        text.textContent = post.text;
+        content.appendChild(text);
 
-          const text = document.createElement("div");
-          text.className = "text";
-          text.textContent = post.text;
-          content.appendChild(text);
+        if (post.images && post.images.length > 0) {
+          const imgDiv = document.createElement("div");
+          imgDiv.className = "images";
+          post.images.forEach(src => {
+            const img = document.createElement("img");
+            img.src = src;
+            imgDiv.appendChild(img);
+          });
+          content.appendChild(imgDiv);
+        }
 
-          if (post.images && post.images.length > 0) {
-            const imgDiv = document.createElement("div");
-            imgDiv.className = "images";
-            post.images.forEach(src => {
-              const img = document.createElement("img");
-              img.src = src;
-              imgDiv.appendChild(img);
-            });
-            content.appendChild(imgDiv);
-          }
+        const time = document.createElement("div");
+        time.className = "timestamp";
+        time.textContent = new Date(post.time).toLocaleString();
+        content.appendChild(time);
 
-          const time = document.createElement("div");
-          time.className = "timestamp";
-          time.textContent = new Date(post.time).toLocaleString();
-          content.appendChild(time);
+        const buttons = document.createElement("div");
+        buttons.className = "buttons";
 
-          const actions = document.createElement("div");
-          actions.className = "actions";
-          actions.innerHTML = `
-            <button class="btn">♡</button>
-            <button class="btn">⭐︎</button>
-            <button class="btn" onclick="deletePost('${post.key}')">削除</button>
-          `;
-          content.appendChild(actions);
+        const likeBtn = document.createElement("button");
+        likeBtn.className = "iconBtn";
+        likeBtn.textContent = "♡";
+        buttons.appendChild(likeBtn);
 
-          div.appendChild(icon);
-          div.appendChild(content);
-          container.appendChild(div);
-        });
+        const starBtn = document.createElement("button");
+        starBtn.className = "iconBtn";
+        starBtn.textContent = "⭐︎";
+        buttons.appendChild(starBtn);
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "deleteBtn";
+        delBtn.textContent = "削除";
+        delBtn.onclick = () => {
+          const posts = JSON.parse(localStorage.getItem("posts") || "[]");
+          const newPosts = posts.filter((_, i) => i !== index);
+          localStorage.setItem("posts", JSON.stringify(newPosts));
+          loadPosts();
+        };
+        buttons.appendChild(delBtn);
+
+        content.appendChild(buttons);
+        div.appendChild(icon);
+        div.appendChild(content);
+        container.appendChild(div);
       });
     }
 
@@ -221,21 +234,13 @@
       });
 
       Promise.all(readers).then(images => {
-        const newPost = {
-          text,
-          images,
-          time: Date.now()
-        };
-        db.ref("posts").push(newPost, () => {
-          document.getElementById("text").value = "";
-          document.getElementById("imageInput").value = "";
-          loadPosts();
-        });
+        const posts = JSON.parse(localStorage.getItem("posts") || "[]");
+        posts.push({ text, images, time: Date.now() });
+        localStorage.setItem("posts", JSON.stringify(posts));
+        document.getElementById("text").value = "";
+        document.getElementById("imageInput").value = "";
+        loadPosts();
       });
-    }
-
-    function deletePost(key) {
-      db.ref("posts/" + key).remove().then(loadPosts);
     }
 
     loadPosts();
